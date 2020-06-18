@@ -9,7 +9,10 @@ def execute():
 		frappe.reload_doctype('Issue')
 
 		count = 0
-		for parent in frappe.get_all('Issue', order_by='creation desc'):
+
+		# update metrics for only last 1000 issues to avoid load
+		issues = frappe.get_all('Issue', order_by='creation desc', limit=1000)
+		for parent in issues:
 			parent_doc = frappe.get_doc('Issue', parent.name)
 
 			communication = frappe.get_all('Communication', filters={
