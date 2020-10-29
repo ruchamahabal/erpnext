@@ -4,22 +4,22 @@
 frappe.provide("erpnext.hr");
 
 erpnext.hr.ExpenseClaimController = frappe.ui.form.Controller.extend({
-	expense_type: function(doc, cdt, cdn) {
-		var d = locals[cdt][cdn];
-		if(!doc.company) {
-			d.expense_type = "";
+	expense_item: function(doc, cdt, cdn) {
+		let d = locals[cdt][cdn];
+		if (!doc.company) {
+			d.expense_item = "";
 			frappe.msgprint(__("Please set the Company"));
 			this.frm.refresh_fields();
 			return;
 		}
 
-		if(!d.expense_type) {
+		if (!d.expense_item) {
 			return;
 		}
 		return frappe.call({
 			method: "erpnext.hr.doctype.expense_claim.expense_claim.get_expense_claim_account_and_cost_center",
 			args: {
-				"expense_claim_type": d.expense_type,
+				"expense_item": d.expense_item,
 				"company": doc.company
 			},
 			callback: function(r) {
@@ -36,7 +36,7 @@ $.extend(cur_frm.cscript, new erpnext.hr.ExpenseClaimController({frm: cur_frm}))
 
 cur_frm.add_fetch('employee', 'company', 'company');
 cur_frm.add_fetch('employee','employee_name','employee_name');
-cur_frm.add_fetch('expense_type','description','description');
+cur_frm.add_fetch('expense_item','description','description');
 
 cur_frm.cscript.onload = function(doc) {
 	if (doc.__islocal) {
@@ -146,6 +146,15 @@ frappe.ui.form.on("Expense Claim", {
 					['paid_amount', '>', 'claimed_amount']
 				]
 			};
+		});
+
+		frm.set_query("expense_item", "expenses", function() {
+			return {
+				filters: {
+					"disabled": 0,
+					"is_stock_item": 0
+				}
+			}
 		});
 
 		frm.set_query("expense_approver", function() {
