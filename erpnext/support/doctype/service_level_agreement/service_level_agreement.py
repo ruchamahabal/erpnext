@@ -172,43 +172,13 @@ class ServiceLevelAgreement(Document):
 
 		meta = frappe.get_meta(self.document_type)
 
-		if meta.custom:
-			self.create_docfields(meta, service_level_agreement_fields)
-		else:
-			self.create_custom_fields(meta, service_level_agreement_fields)
+		self.create_custom_fields(meta, service_level_agreement_fields)
 
 	def on_trash(self):
 		set_documents_with_active_service_level_agreement()
 
 	def after_insert(self):
 		set_documents_with_active_service_level_agreement()
-
-	def create_docfields(self, meta, service_level_agreement_fields):
-		last_index = len(meta.fields)
-
-		for field in service_level_agreement_fields:
-			if not meta.has_field(field.get("fieldname")):
-				last_index += 1
-
-				frappe.get_doc({
-					"doctype": "DocField",
-					"idx": last_index,
-					"parenttype": "DocType",
-					"parentfield": "fields",
-					"parent": self.document_type,
-					"label": field.get("label"),
-					"fieldname": field.get("fieldname"),
-					"fieldtype": field.get("fieldtype"),
-					"collapsible": field.get("collapsible"),
-					"options": field.get("options"),
-					"read_only": field.get("read_only"),
-					"hidden": field.get("hidden"),
-					"description": field.get("description"),
-					"default": field.get("default"),
-				}).insert(ignore_permissions=True)
-			else:
-				existing_field = meta.get_field(field.get("fieldname"))
-				self.reset_field_properties(existing_field, field)
 
 	def create_custom_fields(self, meta, service_level_agreement_fields):
 		for field in service_level_agreement_fields:
