@@ -443,7 +443,7 @@ class PurchaseInvoice(BuyingController):
 		else:
 			self.stock_received_but_not_billed = None
 			self.expenses_included_in_valuation = None
-		
+
 		self.negative_expense_to_be_booked = 0.0
 		gl_entries = []
 
@@ -457,7 +457,7 @@ class PurchaseInvoice(BuyingController):
 		self.make_internal_transfer_gl_entries(gl_entries)
 
 		gl_entries = make_regional_gl_entries(gl_entries, self)
-		
+
 		gl_entries = merge_similar_entries(gl_entries)
 
 		self.make_payment_gl_entries(gl_entries)
@@ -999,10 +999,10 @@ class PurchaseInvoice(BuyingController):
 			self.delete_auto_created_batches()
 
 		self.make_gl_entries_on_cancel()
-		
+
 		if self.update_stock == 1:
 			self.repost_future_sle_and_gle()
-		
+
 		self.update_project()
 		frappe.db.set(self, 'status', 'Cancelled')
 
