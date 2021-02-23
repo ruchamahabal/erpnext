@@ -3,6 +3,7 @@
 
 frappe.provide("erpnext.hr");
 frappe.provide("erpnext.accounts");
+frappe.provide("erpnext.accounts.dimensions");
 {% include "erpnext/public/js/controllers/buying.js" %};
 
 erpnext.hr.ExpenseClaimController = erpnext.buying.BuyingController.extend({
@@ -71,6 +72,14 @@ cur_frm.cscript.refresh = function(doc) {
 };
 
 frappe.ui.form.on("Expense Claim", {
+	onload: function(frm) {
+		erpnext.accounts.dimensions.setup_dimension_filters(frm, frm.doctype);
+	},
+
+	company: function(frm) {
+		erpnext.accounts.dimensions.update_dimension(frm, frm.doctype);
+	},
+
 	refresh: function(frm) {
 		frm.set_query("employee", function() {
 			return {
