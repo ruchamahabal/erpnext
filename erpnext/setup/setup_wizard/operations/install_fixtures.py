@@ -57,6 +57,7 @@ def install(country=None):
 		{'doctype': 'Salary Component', 'salary_component': _('Income Tax'), 'description': _('Income Tax'), 'type': 'Deduction', 'is_income_tax_component': 1},
 		{'doctype': 'Salary Component', 'salary_component': _('Basic'), 'description': _('Basic'), 'type': 'Earning'},
 		{'doctype': 'Salary Component', 'salary_component': _('Arrear'), 'description': _('Arrear'), 'type': 'Earning'},
+		{'doctype': 'Salary Component', 'salary_component': _('Overtime Allowance'), 'description': _('Overtime Allowance'), 'type': 'Earning'},
 		{'doctype': 'Salary Component', 'salary_component': _('Leave Encashment'), 'description': _('Leave Encashment'), 'type': 'Earning'},
 
 
@@ -298,6 +299,7 @@ def set_more_defaults():
 	update_selling_defaults()
 	update_buying_defaults()
 	update_hr_defaults()
+	update_payroll_defaults()
 	add_uom_data()
 	update_item_variant_settings()
 
@@ -333,6 +335,13 @@ def update_hr_defaults():
 	hr_settings.feedback_reminder_notification_template = _("Interview Feedback Reminder")
 
 	hr_settings.save()
+
+def update_payroll_defaults():
+	payroll_settings = frappe.get_doc("Payroll Settings")
+	payroll_settings.overtime_based_on = "Attendance"
+	Payroll_settings.overtime_salary_component = _("Overtime Allowance")
+	payroll_settings.save()
+
 
 def update_item_variant_settings():
 	# set no copy fields of an item doctype to item variant settings
