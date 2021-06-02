@@ -24,7 +24,6 @@ from erpnext.hr.doctype.shift_assignment.shift_assignment import (
 
 class ShiftType(Document):
 	def validate(self):
-
 		self.validate_overtime()
 		self.set_working_hours()
 
@@ -40,12 +39,7 @@ class ShiftType(Document):
 		else:
 			# for night shift
 			time_difference = shift_start - shift_end
-
-		self.working_time_delta = str(time_difference)
-		time_difference = str(time_difference).split(":")
-
-		if int(time_difference[0]) or int(time_difference[1]):
-			self.standard_working_time = time_difference[0] + " Hours " + time_difference[1] + " Minutes"
+		self.standard_working_time = convert_time_into_duration(time_difference)
 
 
 
@@ -69,8 +63,12 @@ class ShiftType(Document):
 		}
 		logs = frappe.db.get_list('Employee Checkin', fields="*", filters=filters, order_by="employee,time")
 
-		for key, group in itertools.groupby(logs, key=lambda x: (x['employee'], x['shift_actual_start'])):
+		if self.allow_overtime == 1:
+			checkins_log = itertools.groupby(logs, key=lambda x: (x['employee'], x['shift_start']))
+		else:
+			checkins_log = itertools.groupby(logs, key=lambda x: (x['employee'], x['shift_actual_start']))
 
+		for key, group in checkins_log:
 			single_shift_logs = list(group)
 			attendance_status, working_hours, late_entry, early_exit, in_time, out_time = self.get_attendance(single_shift_logs)
 
@@ -89,6 +87,7 @@ class ShiftType(Document):
 
 		late_entry = early_exit = False
 		total_working_hours, in_time, out_time = calculate_working_hours(logs, self.determine_check_in_and_check_out, self.working_hours_calculation_based_on)
+		print(total_working_hours)
 
 		if cint(self.enable_entry_grace_period) and in_time and in_time > logs[0].shift_start + timedelta(minutes=cint(self.late_entry_grace_period)):
 			late_entry = True
@@ -97,6 +96,7 @@ class ShiftType(Document):
 			early_exit = True
 
 		if self.working_hours_threshold_for_absent and total_working_hours < self.working_hours_threshold_for_absent:
+			print("------->>", 'Here', print(self.working_hours_threshold_for_absent))
 			return 'Absent', total_working_hours, late_entry, early_exit, in_time, out_time
 
 		if self.working_hours_threshold_for_half_day and total_working_hours < self.working_hours_threshold_for_half_day:
@@ -175,3 +175,8 @@ def get_filtered_date_list(employee, start_date, end_date, filter_attendance=Tru
 		{"employee":employee, "start_date":start_date, "end_date":end_date, "holiday_list":holiday_list}, as_list=True)
 
 	return [getdate(date[0]) for date in dates]
+
+
+def convert_time_into_duration(time_difference):
+	time_difference = str(time_difference).split(":")
+	return (int(time_difference[0]) * 3600) + (int(time_difference[1]) * 60) + int(time_difference[2])
