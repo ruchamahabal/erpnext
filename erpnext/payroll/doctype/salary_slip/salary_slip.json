@@ -646,8 +646,13 @@
  "icon": "fa fa-file-text",
  "idx": 9,
  "is_submittable": 1,
- "links": [],
- "modified": "2021-12-06 12:35:01.369615",
+ "links": [
+  {
+   "link_doctype": "Overtime Slip",
+   "link_fieldname": "salary_slip"
+  }
+ ],
+ "modified": "2021-12-06 13:35:14.650988",
  "modified_by": "Administrator",
  "module": "Payroll",
  "name": "Salary Slip",
