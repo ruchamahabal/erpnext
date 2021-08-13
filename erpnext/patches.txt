@@ -314,3 +314,4 @@ erpnext.patches.v13_0.create_pan_field_for_india #2
 erpnext.patches.v14_0.delete_hub_doctypes
 erpnext.patches.v13_0.create_ksa_vat_custom_fields
 erpnext.patches.v14_0.migrate_crm_settings
+erpnext.patches.v13_0.convert_working_hours_into_duration_and_set_component
