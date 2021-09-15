@@ -4,9 +4,16 @@
 frappe.query_reports["Unpaid Expense Claim"] = {
 	"filters": [
 		{
-			"fieldname":"employee",
+			"fieldname": "company",
+			"label": __("Company"),
+			"fieldtype": "Link",
+			"options": "Company"
+		},
+		{
+			"fieldname": "employee",
 			"label": __("Employee"),
-			"fieldtype": "Link"
+			"fieldtype": "Link",
+			"options": "Employee"
 		}
 	]
 }
