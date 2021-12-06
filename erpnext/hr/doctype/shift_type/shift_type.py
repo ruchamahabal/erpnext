@@ -36,6 +36,7 @@ class ShiftType(Document):
 		else:
 			# for night shift
 			time_difference = shift_start - shift_end
+
 		self.standard_working_time = convert_time_into_duration(time_difference)
 
 	def validate_overtime(self):
