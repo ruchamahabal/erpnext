@@ -132,7 +132,8 @@ class TestTimesheet(unittest.TestCase):
 				"activity_type": "_Test Activity Type",
 				"from_time": now_datetime(),
 				"to_time": now_datetime() + datetime.timedelta(hours=3),
-				"company": "_Test Company"
+				"company": "_Test Company",
+				"hours": 3
 			}
 		)
 		timesheet.append(
@@ -142,7 +143,8 @@ class TestTimesheet(unittest.TestCase):
 				"activity_type": "_Test Activity Type",
 				"from_time": now_datetime(),
 				"to_time": now_datetime() + datetime.timedelta(hours=3),
-				"company": "_Test Company"
+				"company": "_Test Company",
+				"hours": 3
 			}
 		)
 

@@ -577,8 +577,8 @@ class SalarySlip(TransactionBase):
 							frappe.bold(detail.overtime_type)))
 
 					if "applicable_amount" not in overtime_types_details[detail.overtime_type].keys():
-						component_amount = sum([data.default_amount for data in self.earnings if data.salary_component in \
-						overtime_types_details[detail.overtime_type]["components"] and not data.get('additional_salary', None)])
+						component_amount = sum([data.default_amount for data in self.earnings if data.salary_component in
+							overtime_types_details[detail.overtime_type]["components"] and not data.get('additional_salary', None)])
 
 						overtime_types_details[detail.overtime_type]["applicable_daily_amount"] = component_amount/self.total_working_days
 
@@ -618,8 +618,10 @@ class SalarySlip(TransactionBase):
 				frappe.bold("Overtime Salary Component"), frappe.bold("Payroll Settings")
 			))
 		else:
+			component_data = frappe._dict(get_salary_component_data(overtime_salary_component) or {})
+			component_data.salary_component = overtime_salary_component
 			self.update_component_row(
-				get_salary_component_data(overtime_salary_component),
+				component_data,
 				sum(amounts),
 				'earnings',
 				processed_overtime_slips = processed_overtime_slips

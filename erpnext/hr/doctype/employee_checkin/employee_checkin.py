@@ -36,7 +36,10 @@ class EmployeeCheckin(Document):
 
 	def fetch_shift(self):
 		shift_actual_timings = get_actual_start_end_datetime_of_shift(self.employee, get_datetime(self.time), True)
-		if not frappe.db.get_value("Shift Type", shift_actual_timings[2].shift_type.name, "allow_overtime"):
+		allow_overtime = False
+		if shift_actual_timings[2]:
+			allow_overtime = frappe.db.get_value("Shift Type", shift_actual_timings[2].shift_type.name, "allow_overtime")
+		if not allow_overtime:
 			if shift_actual_timings[0] and shift_actual_timings[1]:
 				if shift_actual_timings[2].shift_type.determine_check_in_and_check_out == 'Strictly based on Log Type in Employee Checkin' and not self.log_type and not self.skip_auto_attendance:
 					frappe.throw(_('Log Type is required for check-ins falling in the shift: {0}.').format(shift_actual_timings[2].shift_type.name))
@@ -46,7 +49,7 @@ class EmployeeCheckin(Document):
 					self.shift_actual_end = shift_actual_timings[1]
 					self.shift_start = shift_actual_timings[2].start_datetime
 					self.shift_end = shift_actual_timings[2].end_datetime
-		elif frappe.db.get_value("Shift Type", shift_actual_timings[2].shift_type.name, "allow_overtime"):
+		elif allow_overtime:
 			#because after Actual time it takes check-in/out invalid
 			#if employee checkout late or check-in before before shift timing adding time buffer.
 			self.shift = shift_actual_timings[2].shift_type.name
@@ -85,7 +88,6 @@ def add_log_based_on_employee_field(employee_field_value, timestamp, device_id=N
 	doc.insert()
 
 	return doc
-
 
 def mark_attendance_and_link_log(logs, attendance_status, attendance_date, working_hours=None, late_entry=False, early_exit=False, in_time=None, out_time=None, shift=None):
 	"""Creates an attendance and links the attendance to the Employee Checkin.
@@ -128,9 +130,8 @@ def mark_attendance_and_link_log(logs, attendance_status, attendance_date, worki
 				'in_time': in_time,
 				'out_time': out_time
 			}
-
 			attendance = frappe.get_doc(doc_dict).insert()
-			if frappe.db.get_value("Shift type", shift, "allow_overtime"):
+			if frappe.db.get_value("Shift Type", shift, "allow_overtime"):
 				attendance.calculate_overtime_duration()
 			attendance.save()
 			attendance.submit()

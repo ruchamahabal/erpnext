@@ -23,6 +23,7 @@ from erpnext.payroll.doctype.payroll_entry.payroll_entry import get_end_date, ge
 from erpnext.payroll.doctype.salary_slip.test_salary_slip import (
 	create_account,
 	get_salary_component_account,
+	get_salary_component_for_overtime,
 	make_deduction_salary_component,
 	make_earning_salary_component,
 	make_employee_salary_slip,
@@ -38,6 +39,9 @@ class TestPayrollEntry(unittest.TestCase):
 	@classmethod
 	def setUpClass(cls):
 		frappe.db.set_value("Company", erpnext.get_default_company(), "default_holiday_list", '_Test Holiday List')
+		frappe.db.set_value("Payroll Settings", None, "overtime_salary_component", "Overtime Allowance")
+		get_salary_component_for_overtime()
+
 
 	def setUp(self):
 		for dt in ["Salary Slip", "Salary Component", "Salary Component Account",
