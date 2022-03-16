@@ -77,8 +77,8 @@ class Membership(Document):
 
 	@frappe.whitelist()
 	def generate_invoice(self, save=True, with_payment_entry=False):
-		if not (self.paid or self.currency or self.amount):
-			frappe.throw(_("The payment for this membership is not paid. To generate invoice fill the payment details"))
+		if not (self.paid and self.currency and self.amount):
+			frappe.throw(_("This membership is not paid. To generate the invoice fill the payment details"))
 
 		if self.invoice:
 			frappe.throw(_("An invoice is already linked to this document"))
