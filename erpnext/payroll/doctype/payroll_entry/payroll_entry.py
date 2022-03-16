@@ -149,9 +149,11 @@ class PayrollEntry(Document):
 				"currency": self.currency
 			})
 			if len(employees) > 30:
-				frappe.enqueue(create_salary_slips_for_employees, timeout=600, employees=employees, args=args)
+				frappe.enqueue(create_salary_slips_for_employees, timeout=600, employees=employees, args=args, publish_progress=False)
+				frappe.msgprint(_("Salary Slip creation has been queued. It may take a few minutes."),
+					alert=True, indicator="orange")
 			else:
-				create_salary_slips_for_employees(employees, args, publish_progress=False)
+				create_salary_slips_for_employees(employees, args, publish_progress=True)
 				# since this method is called via frm.call this doc needs to be updated manually
 				self.reload()
 
@@ -182,6 +184,8 @@ class PayrollEntry(Document):
 		ss_list = self.get_sal_slip_list(ss_status=0)
 		if len(ss_list) > 30:
 			frappe.enqueue(submit_salary_slips_for_employees, timeout=600, payroll_entry=self, salary_slips=ss_list)
+			frappe.msgprint(_("Salary Slip submission has been queued. It may take a few minutes."),
+				alert=True, indicator="orange")
 		else:
 			submit_salary_slips_for_employees(self, ss_list, publish_progress=False)
 
