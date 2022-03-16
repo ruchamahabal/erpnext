@@ -5,7 +5,7 @@ import unittest
 
 import frappe
 
-from erpnext.non_profit.doctype.donation.donation import create_donation
+from erpnext.non_profit.doctype.donation.donation import create_razorpay_donation
 
 
 class TestDonation(unittest.TestCase):
@@ -22,17 +22,34 @@ class TestDonation(unittest.TestCase):
 		settings.flags.ignore_permissions = True
 		settings.save()
 
-	def test_payment_entry_for_donations(self):
+	def test_donations(self):
 		donor = create_donor()
 		create_mode_of_payment()
 		payment = frappe._dict({
-			'amount': 100,
+			# rzp amount in paise
+			'amount': 10000,
 			'method': 'Debit Card',
 			'id': 'pay_MeXAmsgeKOhq7O'
 		})
-		donation = create_donation(donor, payment)
+		donation = create_razorpay_donation(donor, payment)
 
 		self.assertTrue(donation.name)
+
+		gl_entries = frappe.db.get_all('GL Entry', fields=['account', 'debit', 'credit'], filters={
+			'voucher_type': 'Donation',
+			'voucher_no': donation.name
+		})
+
+		if gl_entries[0].account == 'Debtors - _TC':
+			self.assertEqual(gl_entries[0].debit, 100)
+			self.assertEqual(gl_entries[0].credit, 0)
+			self.assertEqual(gl_entries[1].debit, 0)
+			self.assertEqual(gl_entries[1].credit, 100)
+		else:
+			self.assertEqual(gl_entries[0].credit, 100)
+			self.assertEqual(gl_entries[0].debit, 0)
+			self.assertEqual(gl_entries[1].credit, 0)
+			self.assertEqual(gl_entries[1].debit, 100)
 
 		# Naive test to check if at all payment entry is generated
 		# This method is actually triggered from Payment Gateway
