@@ -158,12 +158,10 @@
    "read_only": 1
   },
   {
-   "depends_on": "automate_donation_payment_entries",
    "description": "Account for accepting donation payments",
    "fieldname": "donation_payment_account",
    "fieldtype": "Link",
    "label": "Donation Payment To",
-   "mandatory_depends_on": "automate_donation_payment_entries",
    "options": "Account"
   },
   {
@@ -182,11 +180,9 @@
    "options": "Account"
   },
   {
-   "depends_on": "automate_donation_payment_entries",
    "fieldname": "donation_debit_account",
    "fieldtype": "Link",
    "label": "Debit Account",
-   "mandatory_depends_on": "automate_donation_payment_entries",
    "options": "Account"
   },
   {
@@ -232,7 +228,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2021-03-11 10:43:38.124240",
+ "modified": "2022-03-16 22:29:49.743515",
  "modified_by": "Administrator",
  "module": "Non Profit",
  "name": "Non Profit Settings",

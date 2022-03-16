@@ -8,7 +8,6 @@ import frappe
 import six
 from frappe import _
 from frappe.email import sendmail_to_system_managers
-from frappe.model.document import Document
 from frappe.utils import flt, get_link_to_form, getdate
 
 from erpnext.accounts.general_ledger import make_gl_entries
@@ -58,9 +57,7 @@ class Donation(AccountsController):
 		if not settings.automate_donation_payment_entries:
 			return
 
-		if not settings.donation_payment_account:
-			frappe.throw(_('You need to set <b>Payment Account</b> for Donation in {0}').format(
-				get_link_to_form('Non Profit Settings', 'Non Profit Settings')))
+		self.validate_settings(settings)
 
 		from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
 
@@ -84,6 +81,7 @@ class Donation(AccountsController):
 			return
 
 		settings = frappe.get_doc("Non Profit Settings")
+		self.validate_settings(settings)
 
 		donor_gl_entries = self.get_gl_dict({
 			"account": settings.donation_debit_account,
@@ -106,6 +104,17 @@ class Donation(AccountsController):
 		}, item=self)
 
 		make_gl_entries([donor_gl_entries, donation_gl_entry], cancel=cancel)
+
+	def validate_settings(self, settings):
+		if not settings.donation_debit_account:
+			frappe.throw(_('Please set {0} for Donation in {1}').format(
+				frappe.bold(_('Debit Account')),
+				get_link_to_form('Non Profit Settings', 'Non Profit Settings')))
+
+		if not settings.donation_payment_account:
+			frappe.throw(_('Please set {0} account for Donation in {1}').format(
+				frappe.bold(_('Donation Payment To')),
+				get_link_to_form('Non Profit Settings', 'Non Profit Settings')))
 
 
 @frappe.whitelist(allow_guest=True)
