@@ -79,7 +79,7 @@ class Donation(AccountsController):
 	def make_gl_entries(self, cancel=False):
 		if cancel and not frappe.db.exists("GL Entry", {
 			"voucher_type": self.doctype,
-			"voucher_name": self.name
+			"voucher_no": self.name
 		}):
 			return
 
@@ -142,7 +142,7 @@ def capture_razorpay_donations(*args, **kwargs):
 		if not donor:
 			donor = create_donor(payment)
 
-		donation = create_donation(donor, payment)
+		donation = create_razorpay_donation(donor, payment)
 		donation.run_method('create_payment_entry')
 
 	except Exception as e:
@@ -154,7 +154,7 @@ def capture_razorpay_donations(*args, **kwargs):
 	return { 'status': 'Success' }
 
 
-def create_donation(donor, payment):
+def create_razorpay_donation(donor, payment):
 	if not frappe.db.exists('Mode of Payment', payment.method):
 		create_mode_of_payment(payment.method)
 
