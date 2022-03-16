@@ -85,7 +85,7 @@ class Donation(AccountsController):
 
 		settings = frappe.get_doc("Non Profit Settings")
 
-		donor_gl_entries =  self.get_gl_dict({
+		donor_gl_entries = self.get_gl_dict({
 			"account": settings.donation_debit_account,
 			"party_type": "Donor",
 			"party": self.donor,
