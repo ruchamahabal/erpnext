@@ -11,10 +11,12 @@ from frappe.email import sendmail_to_system_managers
 from frappe.model.document import Document
 from frappe.utils import flt, get_link_to_form, getdate
 
+from erpnext.accounts.general_ledger import make_gl_entries
+from erpnext.controllers.accounts_controller import AccountsController
 from erpnext.non_profit.doctype.membership.membership import verify_signature
 
 
-class Donation(Document):
+class Donation(AccountsController):
 	def validate(self):
 		if not self.donor or not frappe.db.exists('Donor', self.donor):
 			# for web forms
@@ -23,6 +25,13 @@ class Donation(Document):
 				self.create_donor_for_website_user()
 			else:
 				frappe.throw(_('Please select a Member'))
+
+	def on_submit(self):
+		self.make_gl_entries()
+
+	def on_cancel(self):
+		self.ignore_linked_doctypes = ['GL Entry']
+		self.make_gl_entries(cancel=True)
 
 	def create_donor_for_website_user(self):
 		donor_name = frappe.get_value('Donor', dict(email=frappe.session.user))
@@ -66,6 +75,37 @@ class Donation(Document):
 		pe.flags.ignore_mandatory = True
 		pe.insert()
 		pe.submit()
+
+	def make_gl_entries(self, cancel=False):
+		if cancel and not frappe.db.exists("GL Entry", {
+			"voucher_type": self.doctype,
+			"voucher_name": self.name
+		}):
+			return
+
+		settings = frappe.get_doc("Non Profit Settings")
+
+		donor_gl_entries =  self.get_gl_dict({
+			"account": settings.donation_debit_account,
+			"party_type": "Donor",
+			"party": self.donor,
+			"against": settings.donation_payment_account,
+			"debit": self.amount,
+			"debit_in_account_currency": self.amount,
+			"against_voucher": self.name,
+			"against_voucher_type": self.doctype,
+			"posting_date": self.date
+		}, item=self)
+
+		donation_gl_entry = self.get_gl_dict({
+			"account": settings.donation_payment_account,
+			"against": self.donor,
+			"credit": self.amount,
+			"credit_in_account_currency": self.amount,
+			"posting_date": self.date
+		}, item=self)
+
+		make_gl_entries([donor_gl_entries, donation_gl_entry], cancel=cancel)
 
 
 @frappe.whitelist(allow_guest=True)
