@@ -209,13 +209,28 @@ def _create_bin(item_code, warehouse):
 @frappe.whitelist()
 def get_incoming_rate(args, raise_error_if_no_rate=True):
 	"""Get Incoming Rate based on valuation method"""
-	from erpnext.stock.stock_ledger import get_previous_sle, get_valuation_rate
+	from erpnext.stock.stock_ledger import (
+		get_batch_incoming_rate,
+		get_previous_sle,
+		get_valuation_rate,
+	)
 	if isinstance(args, str):
 		args = json.loads(args)
 
-	in_rate = 0
+	voucher_no = args.get('voucher_no') or args.get('name')
+
+	in_rate = None
 	if (args.get("serial_no") or "").strip():
 		in_rate = get_avg_purchase_rate(args.get("serial_no"))
+	elif args.get("batch_no") and \
+			frappe.db.get_value("Batch", args.get("batch_no"), "use_batchwise_valuation", cache=True):
+		in_rate = get_batch_incoming_rate(
+			item_code=args.get('item_code'),
+			warehouse=args.get('warehouse'),
+			batch_no=args.get("batch_no"),
+			posting_date=args.get("posting_date"),
+			posting_time=args.get("posting_time"),
+		)
 	else:
 		valuation_method = get_valuation_method(args.get("item_code"))
 		previous_sle = get_previous_sle(args)
@@ -226,12 +241,11 @@ def get_incoming_rate(args, raise_error_if_no_rate=True):
 		elif valuation_method == 'Moving Average':
 			in_rate = previous_sle.get('valuation_rate') or 0
 
-	if not in_rate:
-		voucher_no = args.get('voucher_no') or args.get('name')
+	if in_rate is None:
 		in_rate = get_valuation_rate(args.get('item_code'), args.get('warehouse'),
 			args.get('voucher_type'), voucher_no, args.get('allow_zero_valuation'),
 			currency=erpnext.get_company_currency(args.get('company')), company=args.get('company'),
-			raise_error_if_no_rate=raise_error_if_no_rate)
+			raise_error_if_no_rate=raise_error_if_no_rate, batch_no=args.get("batch_no"))
 
 	return flt(in_rate)
 
@@ -247,7 +261,7 @@ def get_valuation_method(item_code):
 	"""get valuation method from item or default"""
 	val_method = frappe.db.get_value('Item', item_code, 'valuation_method', cache=True)
 	if not val_method:
-		val_method = frappe.db.get_value("Stock Settings", None, "valuation_method") or "FIFO"
+		val_method = frappe.db.get_value("Stock Settings", None, "valuation_method", cache=True) or "FIFO"
 	return val_method
 
 def get_fifo_rate(previous_stock_queue, qty):
@@ -407,19 +421,6 @@ def is_reposting_item_valuation_in_progress():
 		{'docstatus': 1, 'status': ['in', ['Queued','In Progress']]})
 	if reposting_in_progress:
 		frappe.msgprint(_("Item valuation reposting in progress. Report might show incorrect item valuation."), alert=1)
-
-
-def calculate_mapped_packed_items_return(return_doc):
-	parent_items = set([item.parent_item for item in return_doc.packed_items])
-	against_doc = frappe.get_doc(return_doc.doctype, return_doc.return_against)
-
-	for original_bundle, returned_bundle in zip(against_doc.items, return_doc.items):
-		if original_bundle.item_code in parent_items:
-			for returned_packed_item, original_packed_item in zip(return_doc.packed_items, against_doc.packed_items):
-				if returned_packed_item.parent_item == original_bundle.item_code:
-					returned_packed_item.parent_detail_docname = returned_bundle.name
-					returned_packed_item.qty = (original_packed_item.qty / original_bundle.qty) * returned_bundle.qty
-
 
 def check_pending_reposting(posting_date: str, throw_error: bool = True) -> bool:
 	"""Check if there are pending reposting job till the specified posting date."""
