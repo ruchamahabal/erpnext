@@ -149,7 +149,8 @@ def add_attendance(events, start, end, conditions=None):
 		if e not in events:
 			events.append(e)
 
-def mark_attendance(employee, attendance_date, status, shift=None, leave_type=None, ignore_validate=False):
+def mark_attendance(employee, attendance_date, status, shift=None, leave_type=None, ignore_validate=False,
+	late_entry=False, early_exit=False):
 	if not get_duplicate_attendance_record(employee, attendance_date, shift):
 		company = frappe.db.get_value('Employee', employee, 'company')
 		attendance = frappe.get_doc({
@@ -159,7 +160,9 @@ def mark_attendance(employee, attendance_date, status, shift=None, leave_type=No
 			'status': status,
 			'company': company,
 			'shift': shift,
-			'leave_type': leave_type
+			'leave_type': leave_type,
+			'late_entry': late_entry,
+			'early_exit': early_exit
 		})
 		attendance.flags.ignore_validate = ignore_validate
 		attendance.insert()
