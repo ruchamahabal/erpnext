@@ -64,6 +64,51 @@ frappe.ui.form.on('Payroll Entry', {
 			if (frm.custom_buttons) frm.clear_custom_buttons();
 			frm.events.add_context_buttons(frm);
 		}
+
+		if (frm.doc.status == "Failed" && frm.doc.error_message) {
+			const issue = '<a id="jump_to_error" style="text-decoration: underline;">issue</a>';
+			let process = '';
+			if (!frm.doc.salary_slips_created)
+				process = 'creation';
+			else
+				process = 'submission';
+
+			frm.dashboard.set_headline(
+				__('Salary Slip {0} failed. You can resolve the {1} and retry {0}.', [process, issue]));
+
+			$('#jump_to_error').on('click', (e) => {
+				e.preventDefault();
+				frappe.utils.scroll_to(
+					cur_frm.get_field("error_message").$wrapper,
+					true,
+					30
+				);
+			});
+		}
+
+		frappe.realtime.on('completed_salary_slip_creation', async function(data) {
+			await frm.reload_doc();
+			if (frm.doc.status == 'Failed' && frm.doc.error_message && data.user == frappe.session.user) {
+				frappe.msgprint({
+					title: __('Salary Slip creation failed'),
+					message: frm.doc.error_message,
+					indicator: 'orange',
+					clear: true
+				});
+			}
+		});
+
+		frappe.realtime.on('completed_salary_slip_submission', async function(data) {
+			await frm.reload_doc();
+			if (frm.doc.status == 'Failed' && frm.doc.error_message && data.user == frappe.session.user) {
+				frappe.msgprint({
+					title: __('Salary Slip submission failed'),
+					message: frm.doc.error_message,
+					indicator: 'orange',
+					clear: true
+				});
+			}
+		});
 	},
 
 	get_employee_details: function (frm) {
@@ -88,7 +133,7 @@ frappe.ui.form.on('Payroll Entry', {
 			doc: frm.doc,
 			method: "create_salary_slips",
 			callback: function () {
-				frm.refresh();
+				frm.reload_doc();
 				frm.toolbar.refresh();
 			}
 		});
@@ -97,7 +142,7 @@ frappe.ui.form.on('Payroll Entry', {
 	add_context_buttons: function (frm) {
 		if (frm.doc.salary_slips_submitted || (frm.doc.__onload && frm.doc.__onload.submitted_ss)) {
 			frm.events.add_bank_entry_button(frm);
-		} else if (frm.doc.salary_slips_created) {
+		} else if (frm.doc.salary_slips_created && frm.doc.status != 'Queued') {
 			frm.add_custom_button(__("Submit Salary Slip"), function () {
 				submit_salary_slip(frm);
 			}).addClass("btn-primary");
@@ -331,6 +376,7 @@ const submit_salary_slip = function (frm) {
 				method: 'submit_salary_slips',
 				args: {},
 				callback: function () {
+					frm.reload_doc();
 					frm.events.refresh(frm);
 				},
 				doc: frm.doc,

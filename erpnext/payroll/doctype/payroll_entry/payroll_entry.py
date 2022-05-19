@@ -1,6 +1,7 @@
 # Copyright (c) 2017, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import json
 
 import frappe
 from dateutil.relativedelta import relativedelta
@@ -16,6 +17,7 @@ from frappe.utils import (
 	comma_and,
 	date_diff,
 	flt,
+	get_link_to_form,
 	getdate,
 )
 
@@ -39,8 +41,10 @@ class PayrollEntry(Document):
 
 	def validate(self):
 		self.number_of_employees = len(self.employees)
+		self.set_status()
 
 	def on_submit(self):
+		self.set_status(update=True)
 		self.create_salary_slips()
 
 	def before_submit(self):
@@ -48,6 +52,20 @@ class PayrollEntry(Document):
 		if self.validate_attendance:
 			if self.validate_employee_attendance():
 				frappe.throw(_("Cannot Submit, Employees left to mark attendance"))
+
+	def set_status(self, status=None, update=True):
+		if status:
+			self.db_set("status", status)
+		else:
+			status = {
+				0: "Draft",
+				1: "Submitted",
+				2: "Cancelled"
+			}[self.docstatus or 0]
+			if update:
+				self.db_set("status", status)
+			else:
+				self.status = status
 
 	def validate_employee_details(self):
 		emp_with_sal_slip = []
@@ -63,6 +81,7 @@ class PayrollEntry(Document):
 			where payroll_entry=%s """, (self.name)))
 		self.db_set("salary_slips_created", 0)
 		self.db_set("salary_slips_submitted", 0)
+		self.set_status(update=True)
 
 	def get_emp_list(self):
 		"""
@@ -149,9 +168,10 @@ class PayrollEntry(Document):
 				"currency": self.currency
 			})
 			if len(employees) > 30:
+				self.set_status(update=True, status='Queued')
 				frappe.enqueue(create_salary_slips_for_employees, timeout=600, employees=employees, args=args, publish_progress=False)
-				frappe.msgprint(_("Salary Slip creation has been queued. It may take a few minutes."),
-					alert=True, indicator="orange")
+				frappe.msgprint(_("Salary Slip creation will happen in the background. It may take a few minutes"),
+					alert=True, indicator="blue")
 			else:
 				create_salary_slips_for_employees(employees, args, publish_progress=True)
 				# since this method is called via frm.call this doc needs to be updated manually
@@ -183,9 +203,10 @@ class PayrollEntry(Document):
 		self.check_permission('write')
 		ss_list = self.get_sal_slip_list(ss_status=0)
 		if len(ss_list) > 30:
+			self.set_status(update=True, status="Queued")
 			frappe.enqueue(submit_salary_slips_for_employees, timeout=600, payroll_entry=self, salary_slips=ss_list)
-			frappe.msgprint(_("Salary Slip submission has been queued. It may take a few minutes."),
-				alert=True, indicator="orange")
+			frappe.msgprint(_("Salary Slip submission will happen in the background. It may take a few minutes"),
+				alert=True, indicator="blue")
 		else:
 			submit_salary_slips_for_employees(self, ss_list, publish_progress=False)
 
@@ -200,7 +221,7 @@ class PayrollEntry(Document):
 
 		if not account:
 			frappe.throw(_("Please set account in Salary Component {0}")
-				.format(salary_component))
+				.format(get_link_to_form("Salary Component", salary_component)))
 
 		return account
 
@@ -639,33 +660,54 @@ def payroll_entry_has_bank_entries(name):
 
 	return response
 
+
 def create_salary_slips_for_employees(employees, args, publish_progress=True):
-	salary_slips_exists_for = get_existing_salary_slips(employees, args)
-	count=0
-	salary_slips_not_created = []
-	for emp in employees:
-		if emp not in salary_slips_exists_for:
-			args.update({
-				"doctype": "Salary Slip",
-				"employee": emp
-			})
-			ss = frappe.get_doc(args)
-			ss.insert()
-			count+=1
-			if publish_progress:
-				frappe.publish_progress(count*100/len(set(employees) - set(salary_slips_exists_for)),
-					title = _("Creating Salary Slips..."))
+	try:
+		frappe.db.savepoint("salary_slip_creation")
+		payroll_entry = frappe.get_doc("Payroll Entry", args.payroll_entry)
+		salary_slips_exists_for = get_existing_salary_slips(employees, args)
+		count=0
+		salary_slips_not_created = []
+		for emp in employees:
+			if emp not in salary_slips_exists_for:
+				args.update({
+					"doctype": "Salary Slip",
+					"employee": emp
+				})
+				ss = frappe.get_doc(args)
+				ss.insert()
+				count+=1
+				if publish_progress:
+					frappe.publish_progress(count*100/len(set(employees) - set(salary_slips_exists_for)),
+						title = _("Creating Salary Slips..."))
 
-		else:
-			salary_slips_not_created.append(emp)
+			else:
+				salary_slips_not_created.append(emp)
 
-	payroll_entry = frappe.get_doc("Payroll Entry", args.payroll_entry)
-	payroll_entry.db_set("salary_slips_created", 1)
-	payroll_entry.notify_update()
+		payroll_entry.db_set("salary_slips_created", 1)
+		payroll_entry.set_status(update=True, status='Submitted')
 
-	if salary_slips_not_created:
-		frappe.msgprint(_("Salary Slips already exists for employees {}, and will not be processed by this payroll.")
-			.format(frappe.bold(", ".join([emp for emp in salary_slips_not_created]))) , title=_("Message"), indicator="orange")
+		if salary_slips_not_created:
+			frappe.msgprint(_("Salary Slips already exists for employees {}, and will not be processed by this payroll.")
+				.format(frappe.bold(", ".join([emp for emp in salary_slips_not_created]))) , title=_("Message"), indicator="orange")
+
+	except Exception as e:
+		frappe.db.rollback(save_point="salary_slip_creation")
+		message_log = frappe.message_log.pop() if frappe.message_log else str(e)
+
+		try:
+			error_message = json.loads(message_log).get("message")
+		except Exception:
+			error_message = message
+
+		payroll_entry.db_set("error_message", error_message)
+		payroll_entry.set_status(update=True, status='Failed')
+		raise
+
+	finally:
+		frappe.db.commit()
+		frappe.publish_realtime("completed_salary_slip_creation", {"user": frappe.session.user})
+
 
 def get_existing_salary_slips(employees, args):
 	return frappe.db.sql_list("""
@@ -677,40 +719,60 @@ def get_existing_salary_slips(employees, args):
 		[args.company, args.payroll_entry, args.start_date, args.end_date] + employees)
 
 def submit_salary_slips_for_employees(payroll_entry, salary_slips, publish_progress=True):
-	submitted_ss = []
-	not_submitted_ss = []
-	frappe.flags.via_payroll_entry = True
+	try:
+		frappe.db.savepoint("salary_slip_submission")
 
-	count = 0
-	for ss in salary_slips:
-		ss_obj = frappe.get_doc("Salary Slip",ss[0])
-		if ss_obj.net_pay<0:
-			not_submitted_ss.append(ss[0])
-		else:
-			try:
-				ss_obj.submit()
-				submitted_ss.append(ss_obj)
-			except frappe.ValidationError:
+		submitted_ss = []
+		not_submitted_ss = []
+		frappe.flags.via_payroll_entry = True
+
+		count = 0
+		for ss in salary_slips:
+			ss_obj = frappe.get_doc("Salary Slip",ss[0])
+			if ss_obj.net_pay<0:
 				not_submitted_ss.append(ss[0])
+			else:
+				try:
+					ss_obj.submit()
+					submitted_ss.append(ss_obj)
+				except frappe.ValidationError:
+					not_submitted_ss.append(ss[0])
 
-		count += 1
-		if publish_progress:
-			frappe.publish_progress(count*100/len(salary_slips), title = _("Submitting Salary Slips..."))
-	if submitted_ss:
-		payroll_entry.make_accrual_jv_entry()
-		frappe.msgprint(_("Salary Slip submitted for period from {0} to {1}")
-			.format(ss_obj.start_date, ss_obj.end_date))
+			count += 1
+			if publish_progress:
+				frappe.publish_progress(count*100/len(salary_slips), title = _("Submitting Salary Slips..."))
+		if submitted_ss:
+			payroll_entry.make_accrual_jv_entry()
+			frappe.msgprint(_("Salary Slip submitted for period from {0} to {1}")
+				.format(ss_obj.start_date, ss_obj.end_date))
 
-		payroll_entry.email_salary_slip(submitted_ss)
+			payroll_entry.email_salary_slip(submitted_ss)
 
-		payroll_entry.db_set("salary_slips_submitted", 1)
-		payroll_entry.notify_update()
+			payroll_entry.db_set("salary_slips_submitted", 1)
+			payroll_entry.set_status(update=True, status='Submitted')
 
-	if not submitted_ss and not not_submitted_ss:
-		frappe.msgprint(_("No salary slip found to submit for the above selected criteria OR salary slip already submitted"))
+		if not submitted_ss and not not_submitted_ss:
+			frappe.msgprint(_("No salary slip found to submit for the above selected criteria OR salary slip already submitted"))
 
-	if not_submitted_ss:
-		frappe.msgprint(_("Could not submit some Salary Slips"))
+		if not_submitted_ss:
+			frappe.msgprint(_("Could not submit some Salary Slips"))
+
+	except Exception as e:
+		frappe.db.rollback(save_point="salary_slip_submission")
+		message_log = frappe.message_log.pop() if frappe.message_log else str(e)
+
+		try:
+			error_message = json.loads(message_log).get("message")
+		except Exception:
+			error_message = message
+
+		payroll_entry.set_status(update=True, status='Failed')
+		payroll_entry.db_set("error_message", error_message)
+		raise
+
+	finally:
+		frappe.db.commit()
+		frappe.publish_realtime("completed_salary_slip_submission", {"user": frappe.session.user})
 
 @frappe.whitelist()
 @frappe.validate_and_sanitize_search_inputs
